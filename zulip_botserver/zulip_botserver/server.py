@@ -180,6 +180,14 @@ bots_config: Dict[str, Dict[str, str]] = {}
 def handle_bot() -> str:
     event = request.get_json(force=True)
     assert event is not None
+    logging.info(
+        "---> Received: [bot_full_name]=%s [trigger]=%s [message_id]=%s [sender_email]=%s [data]=%s",
+        event.get("bot_full_name"),
+        event.get("trigger"),
+        event.get("message", {}).get("id"),
+        event.get("message", {}).get("sender_email"),
+        event.get("data"),
+    )
     for bot_name, config in bots_config.items():
         if config["email"] == event["bot_email"]:
             bot = bot_name
@@ -219,33 +227,40 @@ def handle_bot() -> str:
     return json.dumps(dict(response_not_required=True))
 
 
-def main() -> None:
-    options = parse_args()
+def initialize_app(
+    *,
+    config_file: Optional[str] = None,
+    use_env_vars: bool = False,
+    bot_name: Optional[str] = None,
+    bot_config_file: Optional[str] = None,
+) -> Flask:
     global bots_config  # noqa: PLW0603
 
-    if options.use_env_vars:
-        bots_config = read_config_from_env_vars(options.bot_name)
-    elif options.config_file:
+    if use_env_vars:
+        bots_config = read_config_from_env_vars(bot_name)
+    elif config_file:
         try:
-            bots_config = read_config_file(options.config_file, options.bot_name)
+            bots_config = read_config_file(config_file, bot_name)
         except MissingSectionHeaderError:
             sys.exit(
                 "Error: Your Botserver config file `{0}` contains an empty section header!\n"
                 "You need to write the names of the bots you want to run in the "
-                "section headers of `{0}`.".format(options.config_file)
+                "section headers of `{0}`.".format(config_file)
             )
         except NoOptionError as e:
             sys.exit(
                 "Error: Your Botserver config file `{0}` has a missing option `{1}` in section `{2}`!\n"
                 "You need to add option `{1}` with appropriate value in section `{2}` of `{0}`".format(
-                    options.config_file, e.option, e.section
+                    config_file, e.option, e.section
                 )
             )
+    else:
+        raise ValueError("Either config_file must be set or use_env_vars must be True.")
 
     available_bots = list(bots_config.keys())
     bots_lib_modules = load_lib_modules(available_bots)
     third_party_bot_conf = (
-        parse_config_file(options.bot_config_file) if options.bot_config_file is not None else None
+        parse_config_file(bot_config_file) if bot_config_file is not None else None
     )
     bot_handlers = load_bot_handlers(
         available_bots, bots_lib_modules, bots_config, third_party_bot_conf
@@ -254,6 +269,43 @@ def main() -> None:
     app.config["BOTS_LIB_MODULES"] = bots_lib_modules
     app.config["BOT_HANDLERS"] = bot_handlers
     app.config["MESSAGE_HANDLERS"] = message_handlers
+    return app
+
+
+def create_app() -> Flask:
+    # WSGI entrypoint configuration via environment variables:
+    # - BOTSERVER_CONFIG_FILE (e.g. /home/meo/botserverrc)
+    # - BOTSERVER_USE_ENV_VARS (set to "1"/"true" to use ZULIP_BOTSERVER_CONFIG)
+    # - BOTSERVER_BOT_NAME (optional single-bot mode, e.g. party)
+    # - BOTSERVER_BOT_CONFIG_FILE (optional third-party bot config file)
+    use_env_vars = os.environ.get("BOTSERVER_USE_ENV_VARS", "").lower() in {"1", "true", "yes"}
+    config_file = os.environ.get("BOTSERVER_CONFIG_FILE")
+    bot_name = os.environ.get("BOTSERVER_BOT_NAME")
+    bot_config_file = os.environ.get("BOTSERVER_BOT_CONFIG_FILE")
+    initialized_app = initialize_app(
+        config_file=config_file,
+        use_env_vars=use_env_vars,
+        bot_name=bot_name,
+        bot_config_file=bot_config_file,
+    )
+    # When running under Gunicorn, route app logs through Gunicorn's logger
+    # so `logging.info(...)` messages from handlers appear in process logs.
+    gunicorn_error_logger = logging.getLogger("gunicorn.error")
+    root_logger = logging.getLogger()
+    if gunicorn_error_logger.handlers:
+        root_logger.handlers = gunicorn_error_logger.handlers
+        root_logger.setLevel(gunicorn_error_logger.level)
+    return initialized_app
+
+
+def main() -> None:
+    options = parse_args()
+    initialize_app(
+        config_file=options.config_file,
+        use_env_vars=options.use_env_vars,
+        bot_name=options.bot_name,
+        bot_config_file=options.bot_config_file,
+    )
     app.run(host=options.hostname, port=int(options.port))
 
 

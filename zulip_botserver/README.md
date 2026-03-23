@@ -28,3 +28,15 @@ bot names to dictionary of their configuration; for example:
 
     ZULIP_BOTSERVER_CONFIG='{"helloworld":{"email":"helloworld-bot@zulip.com","key":"value","site":"http://localhost","token":"abcd1234"}}' \
       zulip-botserver --use-env-vars
+
+Production WSGI example (with Gunicorn):
+
+    pip install gunicorn
+    BOTSERVER_CONFIG_FILE=~/botserverrc BOTSERVER_BOT_NAME=helloworld \
+      gunicorn --bind 127.0.0.1:5002 --workers 2 --threads 4 zulip_botserver.wsgi:application
+
+You can also use environment-backed config for WSGI mode:
+
+    BOTSERVER_USE_ENV_VARS=1 \
+    ZULIP_BOTSERVER_CONFIG='{"helloworld":{"email":"helloworld-bot@zulip.com","key":"value","site":"http://localhost","token":"abcd1234"}}' \
+      gunicorn --bind 127.0.0.1:5002 --workers 2 --threads 4 zulip_botserver.wsgi:application
