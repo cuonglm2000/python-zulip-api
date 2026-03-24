@@ -31,8 +31,11 @@ class PartyHandler:
         elif 'nổ' in message_content.split():
             reply_message = "Nổ vừa thôi bạn ơi [BÙM](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExa2hkM2NpYzhpMmhwMzU4c25sOWo5cTMxd3Q1OXk5aDFtaXluZG5scyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/qwGcDfEAGdJWmuSnwh/giphy.gif)"
             emoji_name = "bomb"
+        elif 'cảm ơn' in message_content.split():
+            reply_message = "Nừn ná na na, nừn ná na na,... [CẢM ƠN ANH](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnp0aWMyNDdpajRoMW5hc2o0d3V1d3A2dWp2Z2FqbTdvcjZsaW80ZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/f1JaQyF57OgpO/giphy.gif)"
+            emoji_name = "heart_eyes"
         else:
-            reply_message = "Bạn làm xong chưa vậy!!!!!"
+            reply_message = "Bạn là điều tuyệt với nhất, điều tuyệt vời mà tôi đánh mất :heart_exclamation: "
             emoji_name = "-1"
 
 
